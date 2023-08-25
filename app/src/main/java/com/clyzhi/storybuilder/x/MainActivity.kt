@@ -6,32 +6,55 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
-import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.nex3z.flowlayout.FlowLayout
 
 
 class MainActivity : AppCompatActivity() {
     private lateinit var userInputEditText: EditText
     private lateinit var userTalkListView: RecyclerView
-    private lateinit var talkArrayList: ArrayList<TalkItem>
+    private var talkArrayList: ArrayList<TalkItem> = ArrayList()
+    private lateinit var adapter: TalkListAdapter
 
-    private val onSendAction: TextView.OnEditorActionListener = TextView.OnEditorActionListener { _, actionId, _ ->
-        Log.d("TAG", "onCreate: $actionId")
-        if (actionId == EditorInfo.IME_ACTION_DONE) {
-            val userInput = userInputEditText.text.toString().trim()
-            if (userInput.isEmpty()) return@OnEditorActionListener false
-            userInputEditText.text.clear()
-            // 在这里执行你想要的操作，例如向服务器发送消息或进行其他处理
-            talkArrayList.add(TalkItem("",userInput))
-            reloadTalkList()
-            return@OnEditorActionListener true
+    private val TAG = "MainActivity"
+
+    companion object {
+        const val TYPE_TEXT = 0
+        const val TYPE_NAME = 1
+        const val TYPE_CLOSE_TEXT = ""
+        const val TYPE_CLOSE_NAME = 0
+
+        const val NAME_DEFAULT = "您"
+        const val NAME_STORY_SAY = "旁白"
+    }
+
+
+    private val onSendAction: TextView.OnEditorActionListener =
+        TextView.OnEditorActionListener { _, actionId, _ ->
+            Log.d(TAG, "onCreate: $actionId")
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                return@OnEditorActionListener onInputEnter()
+            }
+            false
         }
-        false
+
+    fun onInputEnter():Boolean {
+        val userInput = userInputEditText.text.toString().trim()
+        if (userInput.isEmpty()) return false
+        userInputEditText.text.clear()
+        // 在这里执行你想要的操作，例如向服务器发送消息或进行其他处理
+        talkArrayList.add(
+            TalkItem(
+                NAME_DEFAULT, arrayListOf(TalkContent(userInput))
+            )
+        )
+        adapter.notifyItemInserted(talkArrayList.size + 1)
+        userTalkListView.smoothScrollToPosition(talkArrayList.size - 1)
+        return true
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,38 +65,48 @@ class MainActivity : AppCompatActivity() {
         mainActivityToolbar.setBackgroundColor(this.getColor(androidx.appcompat.R.color.button_material_dark))
         mainActivityToolbar.subtitle = this.getString(R.string.app_name)
         userInputEditText = findViewById(R.id.UserInputEditText)
-        userInputEditText.setOnEditorActionListener (onSendAction)
+        userInputEditText.setOnEditorActionListener(onSendAction)
         userTalkListView = findViewById(R.id.TalkListView)
-        reloadTalkList()
-
-    }
-    private fun reloadTalkList(){
         userTalkListView.layoutManager = LinearLayoutManager(this)
-        userTalkListView.adapter = TalkListAdapter(talkArrayList)
+        adapter = TalkListAdapter(talkArrayList)
+        userTalkListView.adapter = adapter
     }
 
-    class TalkListAdapter(private val list: ArrayList<TalkItem>) : RecyclerView.Adapter<TalkListAdapter.ViewHolder>() {
+    class TalkListAdapter(private val list: ArrayList<TalkItem>) :
+        RecyclerView.Adapter<TalkListAdapter.ViewHolder>() {
         class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
-            var name : TextView
-            var text : TextView
-            init{
+            var name: TextView
+            var content: FlowLayout
+
+            init {
                 name = v.findViewById(R.id.name)
-                text = v.findViewById(R.id.content)
+                content = v.findViewById(R.id.content)
             }
         }
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
-        ViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.talk_list_item_view, parent, false))
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder = ViewHolder(
+            LayoutInflater.from(parent.context).inflate(R.layout.talk_list_item_view, parent, false)
+        )
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val el = list[position]
             val name = holder.name
-            val text = holder.text
+            val content = holder.content
             name.text = el.name
-            text.text = el.content
+            el.content.forEach() {
+                val tv = TextView(content.context)
+                tv.text = it.toString()
+                content.addView(tv)
+            }
         }
+
         override fun getItemCount(): Int = list.size
     }
 
-    data class TalkItem(var name:String,var content:String)
+    data class TalkItem(var name: String, var content: ArrayList<TalkContent>)
+    data class TalkContent(var type: Int, var text: String, var tag: Int) {
+        constructor(tag: Int) : this(TYPE_NAME, TYPE_CLOSE_TEXT, tag)
+        constructor(text: String) : this(TYPE_TEXT, text, TYPE_CLOSE_NAME)
+    }
 }
 
